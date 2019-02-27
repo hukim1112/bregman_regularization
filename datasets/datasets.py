@@ -1,12 +1,17 @@
 import tensorflow as tf
 import os
+import sys
+#add package path
+#sys.path.append(os.path.dirname( os.path.abspath(os.path.dirname(__file__))))
+from preprocessing import inception_preprocessing
+
+
 
 def _get_filenames_and_classes(dataset_dir):
-      flower_root = os.path.join(dataset_dir, 'flower_photos')
       directories = []
       class_names = []
-      for dir_name in os.listdir(flower_root):
-        path = os.path.join(flower_root, dir_name)
+      for dir_name in os.listdir(dataset_dir):
+        path = os.path.join(dataset_dir, dir_name)
         if os.path.isdir(path):
           directories.append(path)
           class_names.append(dir_name)
@@ -25,16 +30,18 @@ def load_data(dataset_dir):
     return filepaths, class_names_to_ids
 
 def get_feature_columns(IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_DEPTH):
-  feature_columns = {
-    'images': tf.feature_column.numeric_column('images', (IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_DEPTH)),
-  }
+  feature_columns = []
+  feature_columns.append(tf.feature_column.numeric_column(key='images', shape=(IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_DEPTH)))
+
   return feature_columns
 
 def _parse_function(filename, label):
     image_string = tf.read_file(filename)
     image_decoded = tf.image.decode_jpeg(image_string, channels = 3)
-    image_resized = tf.image.resize_images(image_decoded, [224, 224], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-    return image_resized, label
+    #image_resized = tf.image.resize_images(image_decoded, [224, 224], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    images = inception_preprocessing.preprocess_image(image_decoded, height = 224, width = 224, is_training=True)
+
+    return images, label
 
 def input_fn(filepaths, class_names_to_ids, batch_size):
     num_images = len(filepaths)
@@ -46,7 +53,7 @@ def input_fn(filepaths, class_names_to_ids, batch_size):
     dataset = dataset.repeat()
     dataset = dataset.map(_parse_function, num_parallel_calls=4)
     dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(2)
+    dataset = dataset.prefetch(2*batch_size)
     return dataset
 
 def predict_input_fn(filepaths, class_names_to_ids, batch_size):
@@ -70,7 +77,7 @@ def predict_input_fn(filepaths, class_names_to_ids, batch_size):
 def main():
     print("Testing dataset of flower dataset")
     filepaths, class_names_to_ids =  load_data('/home/dan/prj/datasets/flowers')
-    dataset = train_input_fn(filepaths, class_names_to_ids, 64)
+    dataset = input_fn(filepaths, class_names_to_ids, 64)
     iterator = dataset.make_one_shot_iterator()
     element = iterator.get_next()
 
