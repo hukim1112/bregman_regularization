@@ -88,6 +88,9 @@ def _parse_function(filename, label):
 
 
 def input_fn(filepaths, class_names_to_ids, batch_size):
+  """An input function for training """
+
+  # Convert the inputs to a Dataset
   num_images = len(filepaths)
   dataset_filepath = tf.data.Dataset.from_tensor_slices(
       tf.cast(filepaths, tf.string))
@@ -106,10 +109,11 @@ def predict_input_fn(filepaths, class_names_to_ids, batch_size):
   """An input function for evaluation or prediction"""
 
   # Convert the inputs to a Dataset.
+  num_images = len(filepaths)
   dataset_filepath = tf.data.Dataset.from_tensor_slices(
       tf.cast(filepaths, tf.string), None)
   dataset = dataset.shuffle(num_images)
-  dataset = dataset.repeat()
+  dataset = dataset.repeat(0)
   dataset = dataset.map(_parse_function, num_parallel_calls=4)
 
   # Batch the examples
