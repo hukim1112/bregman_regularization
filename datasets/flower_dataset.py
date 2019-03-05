@@ -69,15 +69,7 @@ def load_data(dataset_dir):
   return filepaths, class_names_to_ids
 
 
-def get_feature_columns(IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_DEPTH):
-  feature_columns = []
-  feature_columns.append(tf.feature_column.numeric_column(
-      key='images', shape=(IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_DEPTH)))
-
-  return feature_columns
-
-
-def _parse_function(filename, label):
+def _parse_function(filename, label=None):
   image_string = tf.read_file(filename)
   image_decoded = tf.image.decode_jpeg(image_string, channels=3)
   #image_resized = tf.image.resize_images(image_decoded, [224, 224], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
@@ -87,18 +79,20 @@ def _parse_function(filename, label):
   return images, label
 
 
-def input_fn(filepaths, class_names_to_ids, batch_size):
+def input_fn(filepaths, class_names_to_ids, batch_size, num_images, mode="training"):
   """An input function for training """
 
   # Convert the inputs to a Dataset
-  num_images = len(filepaths)
   dataset_filepath = tf.data.Dataset.from_tensor_slices(
       tf.cast(filepaths, tf.string))
   dataset_class = tf.data.Dataset.from_tensor_slices(
       [class_names_to_ids[os.path.basename(os.path.dirname(filepath))] for filepath in filepaths])
   dataset = tf.data.Dataset.zip((dataset_filepath, dataset_class))
   dataset = dataset.shuffle(num_images)
-  dataset = dataset.repeat()
+  if mode != "training":
+    dataset = dataset.repeat(0)
+  else:
+    dataset = dataset.repeat()
   dataset = dataset.map(_parse_function, num_parallel_calls=4)
   dataset = dataset.batch(batch_size)
   dataset = dataset.prefetch(2 * batch_size)
@@ -111,15 +105,14 @@ def predict_input_fn(filepaths, class_names_to_ids, batch_size):
   # Convert the inputs to a Dataset.
   num_images = len(filepaths)
   dataset_filepath = tf.data.Dataset.from_tensor_slices(
-      tf.cast(filepaths, tf.string), None)
-  dataset = dataset.shuffle(num_images)
-  dataset = dataset.repeat(0)
+      tf.cast(filepaths, tf.string))
+  dataset_class = tf.data.Dataset.from_tensor_slices(None)
   dataset = dataset.map(_parse_function, num_parallel_calls=4)
 
   # Batch the examples
   assert batch_size is not None, "batch_size must not be None"
   dataset = dataset.batch(batch_size)
-  dataset = dataset.prefetch(2)
+  dataset = dataset.prefetch(2*batch_size)
 
   # Return the dataset.
   return dataset
@@ -127,16 +120,5 @@ def predict_input_fn(filepaths, class_names_to_ids, batch_size):
 
 def main():
   print("Testing dataset of flower dataset")
-  filepaths, class_names_to_ids = load_data('/home/dan/prj/datasets/flowers')
-  dataset = input_fn(filepaths, class_names_to_ids, 64)
-  iterator = dataset.make_one_shot_iterator()
-  element = iterator.get_next()
-
-  sess = tf.Session()
-  image_batch = sess.run(element)
-  print(image_batch[0].shape)
-  sess.close()
-
-
 if __name__ == '__main__':
   main()
