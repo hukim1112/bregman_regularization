@@ -316,7 +316,7 @@ def inception_v1(inputs,
         # if not num_classes:
         #   return net, end_points
         net = slim.dropout(net, dropout_keep_prob, scope='Dropout_0b')
-        print(net.shape)
+
         logits = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
                              normalizer_fn=None, scope='Conv2d_0c_1x1')
         if spatial_squeeze:
@@ -324,7 +324,7 @@ def inception_v1(inputs,
 
         end_points['Logits'] = logits
         end_points['Predictions'] = prediction_fn(logits, scope='Predictions')
-  return logits, end_points
+  return logits, end_points, scope
 inception_v1.default_image_size = 224
 
 inception_v1_arg_scope = inception_utils.inception_arg_scope
