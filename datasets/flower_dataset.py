@@ -4,6 +4,10 @@ import sys
 # add package path
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from preprocessing import inception_preprocessing
+import random
+import os
+import shutil
+
 
 _DATA_URL = 'http://download.tensorflow.org/example_images/flower_photos.tgz'
 
@@ -12,8 +16,8 @@ def download_and_uncompress_tarball(dataset_dir, tarball_url=_DATA_URL):
   """Downloads the `tarball_url` and uncompresses it locally.
 
   Args:
-    tarball_url: The URL of a tarball file.
     dataset_dir: The directory where the temporary files are stored.
+    tarball_url: The URL of a tarball file.
   """
 
   if not tf.gfile.Exists(dataset_dir):
@@ -25,15 +29,6 @@ def download_and_uncompress_tarball(dataset_dir, tarball_url=_DATA_URL):
   filename = tarball_url.split('/')[-1]
   filepath = os.path.join(dataset_dir, filename)
 
-
-def _dataset_exists(dataset_dir):
-  sub_dir = os.listdir(dataset_dir)
-  flower_category = set(['daisy', 'dandelion', 'roses', 'sunflower', 'tulips'])
-  if flower_category.issubset(sub_dir):
-    return True
-  else:
-    return False
-
   def _progress(count, block_size, total_size):
     sys.stdout.write('\r>> Downloading %s %.1f%%' % (
         filename, float(count * block_size) / float(total_size) * 100.0))
@@ -43,6 +38,15 @@ def _dataset_exists(dataset_dir):
   statinfo = os.stat(filepath)
   print('Successfully downloaded', filename, statinfo.st_size, 'bytes.')
   tarfile.open(filepath, 'r:gz').extractall(dataset_dir)
+
+
+def _dataset_exists(dataset_dir):
+  sub_dir = os.listdir(dataset_dir)
+  flower_category = set(['daisy', 'dandelion', 'roses', 'sunflower', 'tulips'])
+  if flower_category.issubset(sub_dir):
+    return True
+  else:
+    return False
 
 
 def _get_filenames_and_classes(dataset_dir):
@@ -72,7 +76,7 @@ def load_data(dataset_dir):
 def _parse_function(filename, label=None):
   image_string = tf.read_file(filename)
   image_decoded = tf.image.decode_jpeg(image_string, channels=3)
-  #image_resized = tf.image.resize_images(image_decoded, [224, 224], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+  # image_resized = tf.image.resize_images(image_decoded, [224, 224], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
   images = inception_preprocessing.preprocess_image(
       image_decoded, height=224, width=224, is_training=True)
 
@@ -112,13 +116,65 @@ def predict_input_fn(filepaths, class_names_to_ids, batch_size):
   # Batch the examples
   assert batch_size is not None, "batch_size must not be None"
   dataset = dataset.batch(batch_size)
-  dataset = dataset.prefetch(2*batch_size)
+  dataset = dataset.prefetch(2 * batch_size)
 
   # Return the dataset.
   return dataset
 
 
+def get_split_dataset(dataset_dir, dest_dir, dict_of_split_info):
+  # Split flower dataset into seperated directory
+  """
+      arguments
+        1. dataset_dir : directory of original dataset uncompressed
+        2. dict_of_split_info : dict of split directory names and number of images each split each split.
+            example : {'train' : 2500, 'eval' : 500, 'test' : 670}. note that all files are 3670.
+      return
+        None but images in original directory would be splited into directories of split names     
+  """
+  # Load dataset from original flower-image names and shuffle them.
+  filepaths, class_names_to_ids = flower_dataset.load_data(dataset_dir)
+  random.shuffle(filepaths)
+
+  splited_list = {}
+  for split_name in dict_of_split_info.keys():
+    splited_list[split_name], filepaths = split_list(
+        filepaths, dict_of_split_info[split_name])
+
+  # Check total numbers in dictionary to be matched with real total number of files.
+  if len(filepaths) != 0:
+    print("total number of images is not correct in your split_num dictionary.")
+    return
+
+  # Make directories for each category of each split
+  for split_name in dict_of_split_info.keys():
+    for category in class_names_to_ids.keys():
+      os.makedirs(os.path.join(dest_dir, split_name, category), exist_ok=True)
+
+  # Copy src_file in original directory to dest separated by splits("train", "eval", "test")
+  for split_name in splited_list.keys():
+    path = os.path.join(dest_dir, split_name)
+    for src_file in splited_list[split_name]:
+      filename = os.path.basename(src_file)
+      category = os.path.split(os.path.dirname(src_file))[1]
+      print(category)
+      dest_file = os.path.join(path, category, filename)
+      shutil.copyfile(src_file, dest_file)
+
+  return
+
+
+def split_list(_list, amount):
+  return _list[:amount], _list[amount:]
+
+
 def main():
   print("Testing dataset of flower dataset")
+  dict_of_split_info = {'train': 2500, 'eval': 500, 'test': 670}
+  dataset_dir = "/home/dan/prj/datasets/flower_photos"
+  dest_dir = '/home/dan/prj/datasets/flower_exp1'
+  get_split_dataset(dataset_dir, dest_dir, dict_of_split_info)
+
+
 if __name__ == '__main__':
   main()
