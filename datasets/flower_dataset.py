@@ -94,7 +94,7 @@ def input_fn(filepaths, class_names_to_ids, batch_size, num_images, mode="traini
   dataset = tf.data.Dataset.zip((dataset_filepath, dataset_class))
   dataset = dataset.shuffle(num_images)
   if mode != "training":
-    dataset = dataset.repeat(0)
+    dataset = dataset.repeat(1)
   else:
     dataset = dataset.repeat()
   dataset = dataset.map(_parse_function, num_parallel_calls=4)
@@ -133,7 +133,7 @@ def get_split_dataset(dataset_dir, dest_dir, dict_of_split_info):
         None but images in original directory would be splited into directories of split names     
   """
   # Load dataset from original flower-image names and shuffle them.
-  filepaths, class_names_to_ids = flower_dataset.load_data(dataset_dir)
+  filepaths, class_names_to_ids = load_data(dataset_dir)
   random.shuffle(filepaths)
 
   splited_list = {}
@@ -157,7 +157,6 @@ def get_split_dataset(dataset_dir, dest_dir, dict_of_split_info):
     for src_file in splited_list[split_name]:
       filename = os.path.basename(src_file)
       category = os.path.split(os.path.dirname(src_file))[1]
-      print(category)
       dest_file = os.path.join(path, category, filename)
       shutil.copyfile(src_file, dest_file)
 
@@ -169,10 +168,15 @@ def split_list(_list, amount):
 
 
 def main():
-  print("Testing dataset of flower dataset")
-  dict_of_split_info = {'train': 2500, 'eval': 500, 'test': 670}
-  dataset_dir = "/home/dan/prj/datasets/flower_photos"
-  dest_dir = '/home/dan/prj/datasets/flower_exp1'
+  dict_of_split_info = {'train': 2500, 'eval': 1170}
+  
+  splits_name = ""
+  for i in dict_of_split_info.keys():
+  	splits_name = splits_name + " " + i
+
+  print("split flower dataset into {}".format(splits_name))
+  dataset_dir = "/home/dan/prj/datasets/flowers/flower_photos"
+  dest_dir = '/home/dan/prj/datasets/flowers/flower_example1'
   get_split_dataset(dataset_dir, dest_dir, dict_of_split_info)
 
 

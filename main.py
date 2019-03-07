@@ -9,8 +9,8 @@ def main():
      			 'model_dir' : '/home/dan/prj/checkpoints/flowers/vanilla',
      			 'iteration' : 20000,
      			  'num_classes' : 5,
-     			   'train_datadir' : '/home/dan/prj/datasets/flowers/train',
-     			    'eval_datadir' : '/home/dan/prj/datasets/flowers/eval'}
+     			   'train_datadir' : '/home/dan/prj/datasets/flowers/flower_example1/train',
+     			    'eval_datadir' : '/home/dan/prj/datasets/flowers/flower_example1/eval'}
 
     classifier = models.model(params)
     classifier.train(params)

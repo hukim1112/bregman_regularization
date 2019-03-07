@@ -22,8 +22,6 @@ class model():
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
             variables_to_restore = self.get_init_fn(var_list)
 
-            print(variables_to_restore)
-
             self.saver = tf.train.Saver(var_list=variables_to_restore)
             self.initializer = tf.global_variables_initializer()
 
@@ -45,9 +43,9 @@ class model():
             for i in range(params['iteration']):
                 _, loss, global_step = self.sess.run(
                     [self.cross_entropy_solver, self.loss, self.global_step])
-                if i % 10:
+                if i % 10 == 0:
                     print("iteration {} : loss={}".format(global_step, loss))
-                if i % 1000:
+                if i % 1000 == 0:
                     score = self.eval(params)
                     print("evaluation accuracy {}".format(score))
                     tf.summary.scalar('eval_accuracy', score)
@@ -60,22 +58,12 @@ class model():
 
     def eval(self, params):
         # Initialize counter at each epoch
+        self.sess.run(self.eval_dataset_iterator.initializer)
         self.sess.run(self.running_vars_initializer)
 
         for i in range(self.batch_per_epoch):
             self.sess.run(self.update_op)
-
         score = self.sess.run(self.accuracy)
-        return score
-
-    def test(self, params):
-
-        print('number of evaluation dataset {}'.format(
-            sess.run(self.num_eval_images)))
-
-        # Initialize counter at each epoch
-        for i in range(self.batch_per_epoch):
-            self.sess.run(self.eval_images)
         return score
 
     def load_batch(self, dataset_dir, batch_size, mode='training'):
@@ -84,12 +72,15 @@ class model():
         if mode == 'predict':
             dataset = flower_dataset.predict_input_fn(
                 filepaths, class_name_to_ids, batch_size)
-        else:
+        elif mode == 'training':
             dataset = flower_dataset.input_fn(
                 filepaths, class_name_to_ids, batch_size, num_images, mode)
-        iterator = dataset.make_one_shot_iterator()
-        images, labels = iterator.get_next()
-        return images, labels, num_images
+            iterator = dataset.make_one_shot_iterator()
+        else: #'eval'
+            dataset = flower_dataset.input_fn(
+                filepaths, class_name_to_ids, batch_size, num_images, mode)
+            iterator = dataset.make_initializable_iterator()
+        return iterator, num_images
 
     def inference(self, images, params, reuse=None):
         with slim.arg_scope(inception.inception_v1_arg_scope()):
@@ -99,31 +90,19 @@ class model():
 
     def train_model_fn(self, params):
 
-        images, labels, _ = self.load_batch(
+        # get batch of training dataset
+        training_dataset_iterator, _ = self.load_batch(
             params['train_datadir'], params['batch_size'], mode='training')
+        images, labels = training_dataset_iterator.get_next()
 
-        self.eval_images, eval_labels, self.num_eval_images = self.load_batch(
+        # get a batch of evaluation dataset
+        self.eval_dataset_iterator, num_eval_images = self.load_batch(
             params['eval_datadir'], params['batch_size'], mode='eval')
-        self.batch_per_epoch = math.ceil(
-            num_eval_images / params['batch_size'])
+        eval_images, eval_labels = self.eval_dataset_iterator.get_next()
+        self.batch_per_epoch = math.ceil(num_eval_images / params['batch_size'])
 
         # bring our model for training
         logits, scope = self.inference(images, params)
-
-        # Reuse our model for evaluating
-        eval_logits, scope = self.inference(
-            eval_images, params, reuse=tf.AUTO_REUSE)
-        predicted_indices = tf.argmax(input=eval_logits, axis=1)
-        #probabilities = tf.nn.softmax(logits, name='soft_tensor')
-        self.accuracy, self.update_op = tf.metrics.accuracy(labels=eval_labels,
-                                                            predictions=predicted_indices,
-                                                            name='acc_op')
-        # Isolate the variables stored behind the scenes by the metric operation
-        running_vars = tf.get_collection(
-            tf.GraphKeys.LOCAL_VARIABLES, scope="acc_op")
-        # Define initializer to initialize/reset running variables
-        self.running_vars_initializer = tf.variables_initializer(
-            var_list=running_vars)
 
         model_var = tf.get_collection(
             tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope.name)
@@ -135,6 +114,20 @@ class model():
         self.cross_entropy_solver = optimizer.minimize(
             self.loss, global_step=self.global_step, var_list=model_var)
         tf.summary.scalar('cross_entropy', self.loss)
+
+
+        # build a graph for evaluation. Reuse our model for evaluating
+        eval_logits, scope = self.inference(eval_images, params, reuse=tf.AUTO_REUSE)
+        predicted_indices = tf.argmax(input=eval_logits, axis=1)
+        #probabilities = tf.nn.softmax(logits, name='soft_tensor')
+        self.accuracy, self.update_op = tf.metrics.accuracy(labels=eval_labels,
+                                                            predictions=predicted_indices,
+                                                            name='acc_op')
+        # Isolate the variables stored behind the scenes by the metric operation
+        running_vars = tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES, scope="acc_op")
+        # Define initializer to initialize/reset running variables
+        self.running_vars_initializer = tf.variables_initializer(var_list=running_vars)
+
         return
 
     def get_init_fn(self, var_list):
