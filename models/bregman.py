@@ -2,6 +2,7 @@
 import tensorflow as tf
 from backbone import inception
 from datasets import flower_dataset
+from models import bregman_regularizer as bregman
 import math
 slim = tf.contrib.slim
 
@@ -42,7 +43,8 @@ class model():
         try:
             for i in range(params['iteration']):
                 _, loss, global_step = self.sess.run(
-                    [self.cross_entropy_solver, self.loss, self.global_step])
+                    [self.solver, self.loss, self.global_step])
+                self.sess.run(self.update_prototypes)
                 if i % 10 == 0:
                     print("iteration {} : loss={}".format(global_step, loss))
                 if i % 1000 == 0:
@@ -86,7 +88,7 @@ class model():
         with slim.arg_scope(inception.inception_v1_arg_scope()):
             logits, endpoints, scope = inception.inception_v1(
                 images, num_classes=params['num_classes'], is_training=True, reuse=reuse)
-        return logits, scope
+        return logits, endpoints, scope
 
     def train_model_fn(self, params):
 
@@ -102,22 +104,33 @@ class model():
         self.batch_per_epoch = math.ceil(num_eval_images / params['batch_size'])
 
         # bring our model for training
-        logits, scope = self.inference(images, params)
+        logits, endpoints, scope = self.inference(images, params)
+        embeddings = endpoints['AvgPool_0a_7x7']
+        embeddings = tf.squeeze(embeddings, [1, 2], name='SpatialSqueeze')
 
         model_var = tf.get_collection(
             tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope.name)
         self.global_step = tf.train.get_or_create_global_step()
-        one_hot_labels = tf.one_hot(labels, depth=params['num_classes'])
-        self.loss = tf.losses.softmax_cross_entropy(one_hot_labels, logits)
-        optimizer = tf.train.AdamOptimizer(
-            learning_rate=params['learning_rate'])
-        self.cross_entropy_solver = optimizer.minimize(
-            self.loss, global_step=self.global_step, var_list=model_var)
-        tf.summary.scalar('cross_entropy', self.loss)
 
+        # Cross-entropy optimization
+        one_hot_labels = tf.one_hot(labels, depth=params['num_classes'])
+        cross_entropy_loss = tf.losses.softmax_cross_entropy(one_hot_labels, logits)
+
+
+        # Bregman regularization optimization
+        prototypes = tf.get_variable('prototypes' , shape = ( params['num_classes'], embeddings.shape[1] ), dtype=tf.float32, trainable=False)
+        bregman_loss = bregman.get_bregman_loss_from_embeddings(embeddings, labels, prototypes, params['num_classes'])
+        new_prototypes = bregman.get_prototypes_from_embeddings(embeddings, labels, params['num_classes'])
+        self.update_prototypes = tf.assign(prototypes, new_prototypes)
+
+
+        self.loss = cross_entropy_loss + bregman_loss
+        optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
+        self.solver = optimizer.minimize(self.loss, global_step=self.global_step, var_list=model_var)
+        tf.summary.scalar('cross_entropy+bregman_loss', self.loss)
 
         # build a graph for evaluation. Reuse our model for evaluating
-        eval_logits, scope = self.inference(eval_images, params, reuse=tf.AUTO_REUSE)
+        eval_logits, _, __ = self.inference(eval_images, params, reuse=tf.AUTO_REUSE)
         predicted_indices = tf.argmax(input=eval_logits, axis=1)
         #probabilities = tf.nn.softmax(logits, name='soft_tensor')
         self.accuracy, self.update_op = tf.metrics.accuracy(labels=eval_labels,

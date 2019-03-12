@@ -166,9 +166,37 @@ def get_split_dataset(dataset_dir, dest_dir, dict_of_split_info):
 def split_list(_list, amount):
   return _list[:amount], _list[amount:]
 
+def get_train_split(dataset_dir, dest_dir, train_dataset_split_num):
+  # Split flower dataset into seperated directory
+  """
+      arguments
+        1. dataset_dir : directory of original dataset uncompressed
+        2. dict_of_split_info : dict of split directory names and number of images each split each split.
+            example : {'train' : 2500, 'eval' : 500, 'test' : 670}. note that all files are 3670.
+      return
+        None but images in original directory would be splited into directories of split names     
+  """
+  # Load dataset from original flower-image names and shuffle them.
+  filepaths, class_names_to_ids = load_data(dataset_dir)
+  random.shuffle(filepaths)
+  for num in train_dataset_split_num:
+    # Make directories of splited train dataset
+    _path = os.path.join(dest_dir, 'train_'+str(num))
+    for category in class_names_to_ids.keys():
+      os.makedirs(os.path.join(_path, category), exist_ok=True)
+    splited_list, _ = split_list(filepaths, num)
+    print('ss')
+    for src_file in splited_list:
+      filename = os.path.basename(src_file)
+      category = os.path.split(os.path.dirname(src_file))[1]
+      dest_file = os.path.join(_path, category, filename)
+      shutil.copyfile(src_file, dest_file)
+
+  return
+
 
 def main():
-  dict_of_split_info = {'train': 2500, 'eval': 1170}
+  dict_of_split_info = {'train': 2500, 'eval': 670, 'test' : 500}
   
   splits_name = ""
   for i in dict_of_split_info.keys():
