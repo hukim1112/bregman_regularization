@@ -44,7 +44,7 @@ class model():
             for i in range(1, params['iteration']+1):
                 _, loss, global_step = self.sess.run(
                     [self.cross_entropy_solver, self.loss, self.global_step])
-                if i % 10 == 0:
+                if i % 100 == 0:
                     print("iteration {} : loss={}".format(global_step, loss))
                 if i % 1000 == 0:
                     score = self.eval(params)

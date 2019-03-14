@@ -66,6 +66,16 @@ def _get_filenames_and_classes(dataset_dir):
 
   return photo_filenames, sorted(class_names)
 
+def load_categorical_data(datset_dir):
+  filepaths = {}
+  class_names = []
+  for dir_name in os.listdir(dataset_dir):
+    path = os.path.join(dataset_dir, dir_name)
+    filepaths[dir_name] = os.listdir(path)
+    class_names.append(dir_name)
+
+  class_names_to_ids = dict(zip(class_names, range(len(class_names))))
+  return filepaths, class_names_to_ids
 
 def load_data(dataset_dir):
   filepaths, class_names = _get_filenames_and_classes(dataset_dir)
@@ -101,6 +111,7 @@ def input_fn(filepaths, class_names_to_ids, batch_size, num_images, mode="traini
   dataset = dataset.batch(batch_size)
   dataset = dataset.prefetch(2 * batch_size)
   return dataset
+
 
 
 def predict_input_fn(filepaths, class_names_to_ids, batch_size):

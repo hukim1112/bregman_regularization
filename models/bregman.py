@@ -43,13 +43,13 @@ class model():
     def train(self, params):
         try:
             for i in range(1, params['iteration']+1):
-                global_step = self.sess.run(self.global_step)
                 if i != 1:
-                    _, loss = self.sess.run([self.solver, self.loss])
-                self.sess.run(self.update_prototypes)
-                if i % 100 == 0:
+                    _, loss, __, global_step = self.sess.run([self.solver, self.loss, self.update_prototypes, self.global_step])
+                else:
+                    _, global_step = self.sess.run([self.update_prototypes, self.global_step])
+                if i % 10 == 0:
                     print("iteration {} : loss={}".format(global_step, loss))
-                if i % 1000 == 0:
+                if i % 500 == 0:
                     score = self.eval(params)
                     print("evaluation accuracy {}".format(score))
                     if self.eval_max < score:
