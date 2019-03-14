@@ -17,7 +17,8 @@ class model():
         config = tf.ConfigProto()
         config.gpu_options.per_process_gpu_memory_fraction = 0.4
         self.sess = tf.Session(graph=self.graph, config=config)
-
+        self.eval_max = 0
+        self.eval_max_global_step = 0
         with self.graph.as_default():
             self.train_model_fn(params)
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
@@ -41,18 +42,24 @@ class model():
 
     def train(self, params):
         try:
-            for i in range(params['iteration']):
-                _, loss, global_step = self.sess.run(
-                    [self.solver, self.loss, self.global_step])
+            for i in range(1, params['iteration']+1):
+                global_step = self.sess.run(self.global_step)
+                if i != 1:
+                    _, loss = self.sess.run([self.solver, self.loss])
                 self.sess.run(self.update_prototypes)
-                if i % 10 == 0:
+                if i % 100 == 0:
                     print("iteration {} : loss={}".format(global_step, loss))
                 if i % 1000 == 0:
                     score = self.eval(params)
                     print("evaluation accuracy {}".format(score))
+                    if self.eval_max < score:
+                        self.eval_max = score
+                        self.eval_max_global_step = global_step
                     tf.summary.scalar('eval_accuracy', score)
                     self.saver.save(
                         self.sess, params['model_dir'], global_step=self.global_step)
+                if i == params['iteration']:
+                    print(self.eval_max, self.eval_max_global_step)
         except KeyboardInterrupt:
             print('Got Keyboard Interrupt, saving model and close')
             self.saver.save(
@@ -67,6 +74,7 @@ class model():
             self.sess.run(self.update_op)
         score = self.sess.run(self.accuracy)
         return score
+
 
     def load_batch(self, dataset_dir, batch_size, mode='training'):
         filepaths, class_name_to_ids = flower_dataset.load_data(dataset_dir)
@@ -113,25 +121,33 @@ class model():
         self.global_step = tf.train.get_or_create_global_step()
 
         # Cross-entropy optimization
-        one_hot_labels = tf.one_hot(labels, depth=params['num_classes'])
-        cross_entropy_loss = tf.losses.softmax_cross_entropy(one_hot_labels, logits)
+        #one_hot_labels = tf.one_hot(labels, depth=params['num_classes'])
+        #cross_entropy_loss = tf.losses.softmax_cross_entropy(one_hot_labels, logits)
 
 
         # Bregman regularization optimization
         prototypes = tf.get_variable('prototypes' , shape = ( params['num_classes'], embeddings.shape[1] ), dtype=tf.float32, trainable=False)
-        bregman_loss = bregman.get_bregman_loss_from_embeddings(embeddings, labels, prototypes, params['num_classes'])
+        #bregman_loss = bregman.get_bregman_loss_from_embeddings(embeddings, labels, prototypes, params['num_classes'])
+        classifier_scores = bregman.prototypical_classifier(embeddings, labels, prototypes, params['num_classes'])
+        one_hot_labels = tf.one_hot(labels, depth=params['num_classes'])
+        cross_entropy_loss = tf.losses.softmax_cross_entropy(one_hot_labels, classifier_scores)
+
         new_prototypes = bregman.get_prototypes_from_embeddings(embeddings, labels, params['num_classes'])
         self.update_prototypes = tf.assign(prototypes, new_prototypes)
 
 
-        self.loss = cross_entropy_loss + bregman_loss
+        self.loss = cross_entropy_loss
         optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
         self.solver = optimizer.minimize(self.loss, global_step=self.global_step, var_list=model_var)
-        tf.summary.scalar('cross_entropy+bregman_loss', self.loss)
+        tf.summary.scalar('bregman_loss', self.loss)
 
         # build a graph for evaluation. Reuse our model for evaluating
-        eval_logits, _, __ = self.inference(eval_images, params, reuse=tf.AUTO_REUSE)
-        predicted_indices = tf.argmax(input=eval_logits, axis=1)
+        _, eval_endpoints, __ = self.inference(eval_images, params, reuse=tf.AUTO_REUSE)
+        eval_embeddings = eval_endpoints['AvgPool_0a_7x7']
+        eval_embeddings = tf.squeeze(eval_embeddings, [1, 2], name='SpatialSqueeze')
+        classifier_scores = bregman.prototypical_classifier(eval_embeddings, labels, prototypes, params['num_classes'])
+
+        predicted_indices = tf.argmax(input=classifier_scores, axis=1)
         #probabilities = tf.nn.softmax(logits, name='soft_tensor')
         self.accuracy, self.update_op = tf.metrics.accuracy(labels=eval_labels,
                                                             predictions=predicted_indices,

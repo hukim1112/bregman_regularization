@@ -16,7 +16,8 @@ class model():
         config = tf.ConfigProto()
         config.gpu_options.per_process_gpu_memory_fraction = 0.4
         self.sess = tf.Session(graph=self.graph, config=config)
-
+        self.eval_max = 0
+        self.eval_max_global_step = 0
         with self.graph.as_default():
             self.train_model_fn(params)
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
@@ -40,7 +41,7 @@ class model():
 
     def train(self, params):
         try:
-            for i in range(params['iteration']):
+            for i in range(1, params['iteration']+1):
                 _, loss, global_step = self.sess.run(
                     [self.cross_entropy_solver, self.loss, self.global_step])
                 if i % 10 == 0:
@@ -48,9 +49,14 @@ class model():
                 if i % 1000 == 0:
                     score = self.eval(params)
                     print("evaluation accuracy {}".format(score))
+                    if self.eval_max < score:
+                        self.eval_max = score
+                        self.eval_max_global_step = global_step
                     tf.summary.scalar('eval_accuracy', score)
                     self.saver.save(
                         self.sess, params['model_dir'], global_step=self.global_step)
+                if i == params['iteration']:
+                    print(self.eval_max, self.eval_max_global_step)
         except KeyboardInterrupt:
             print('Got Keyboard Interrupt, saving model and close')
             self.saver.save(

@@ -196,8 +196,8 @@ def get_train_split(dataset_dir, dest_dir, train_dataset_split_num):
 
 
 def main():
-  dict_of_split_info = {'train': 2500, 'eval': 670, 'test' : 500}
-  
+  #dict_of_split_info = {'train': 2500, 'eval': 670, 'test' : 500}
+  dict_of_split_info = {'train' : 2500, 'test' : 1170}
   splits_name = ""
   for i in dict_of_split_info.keys():
   	splits_name = splits_name + " " + i

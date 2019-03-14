@@ -44,3 +44,17 @@ def get_loss_each_prototype(embeddings, prototype, indice_each_class):
     squared_l2_distance = tf.reduce_sum(
         tf.pow(prototype - embeddings_of_the_label, 2))
     return squared_l2_distance
+
+def prototypical_classifier(embeddings, labels, prototypes, class_num):
+    class_ids = list(range(class_num))
+    class_ids = tf.reshape(tf.constant(class_ids), shape=(len(class_ids), 1))
+    # indice corresponding each class on embeddings
+    indice = tf.equal(labels, class_ids)
+
+    scores = tf.map_fn(lambda x: distance_from_prototypes(x, prototypes), embeddings, dtype=embeddings.dtype)
+    return scores
+
+def distance_from_prototypes(embedding, prototypes):
+    distance_vector = prototypes - embedding
+    l2_distance_from_prototypes = tf.norm(distance_vector, axis=1)
+    return -l2_distance_from_prototypes
