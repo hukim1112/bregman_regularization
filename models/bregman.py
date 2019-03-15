@@ -42,11 +42,13 @@ class model():
 
     def train(self, params):
         try:
-            for i in range(1, params['iteration']+1):
+            for i in range(1, params['iteration'] + 1):
                 if i != 1:
-                    _, loss, __, global_step = self.sess.run([self.solver, self.loss, self.update_prototypes, self.global_step])
+                    _, loss, __, global_step = self.sess.run(
+                        [self.solver, self.loss, self.update_prototypes, self.global_step])
                 else:
-                    _, global_step = self.sess.run([self.update_prototypes, self.global_step])
+                    _, global_step = self.sess.run(
+                        [self.update_prototypes, self.global_step])
                 if i % 10 == 0:
                     print("iteration {} : loss={}".format(global_step, loss))
                 if i % 500 == 0:
@@ -75,18 +77,23 @@ class model():
         score = self.sess.run(self.accuracy)
         return score
 
-
     def load_batch(self, dataset_dir, batch_size, mode='training'):
-        filepaths, class_name_to_ids = flower_dataset.load_data(dataset_dir)
-        num_images = len(filepaths)
+
         if mode == 'predict':
+            filepaths, class_name_to_ids = flower_dataset.load_data(
+                dataset_dir)
+            num_images = len(filepaths)
             dataset = flower_dataset.predict_input_fn(
                 filepaths, class_name_to_ids, batch_size)
         elif mode == 'training':
-            dataset = flower_dataset.input_fn(
-                filepaths, class_name_to_ids, batch_size, num_images, mode)
-            iterator = dataset.make_one_shot_iterator()
-        else: #'eval'
+            filepaths, class_names_to_ids = load_categorical_data(dataset_dir)
+            stacked_data = flower_dataset.categorical_input_fn(
+                filepaths, class_name_to_ids, categorical_batch_size, num_images, mode)
+            return stacked_data
+        else:  # 'eval'
+            filepaths, class_name_to_ids = flower_dataset.load_data(
+                dataset_dir)
+            num_images = len(filepaths)
             dataset = flower_dataset.input_fn(
                 filepaths, class_name_to_ids, batch_size, num_images, mode)
             iterator = dataset.make_initializable_iterator()
@@ -109,7 +116,8 @@ class model():
         self.eval_dataset_iterator, num_eval_images = self.load_batch(
             params['eval_datadir'], params['batch_size'], mode='eval')
         eval_images, eval_labels = self.eval_dataset_iterator.get_next()
-        self.batch_per_epoch = math.ceil(num_eval_images / params['batch_size'])
+        self.batch_per_epoch = math.ceil(
+            num_eval_images / params['batch_size'])
 
         # bring our model for training
         logits, endpoints, scope = self.inference(images, params)
@@ -124,28 +132,35 @@ class model():
         #one_hot_labels = tf.one_hot(labels, depth=params['num_classes'])
         #cross_entropy_loss = tf.losses.softmax_cross_entropy(one_hot_labels, logits)
 
-
         # Bregman regularization optimization
-        prototypes = tf.get_variable('prototypes' , shape = ( params['num_classes'], embeddings.shape[1] ), dtype=tf.float32, trainable=False)
+        prototypes = tf.get_variable('prototypes', shape=(
+            params['num_classes'], embeddings.shape[1]), dtype=tf.float32, trainable=False)
         #bregman_loss = bregman.get_bregman_loss_from_embeddings(embeddings, labels, prototypes, params['num_classes'])
-        classifier_scores = bregman.prototypical_classifier(embeddings, labels, prototypes, params['num_classes'])
+        classifier_scores = bregman.prototypical_classifier(
+            embeddings, labels, prototypes, params['num_classes'])
         one_hot_labels = tf.one_hot(labels, depth=params['num_classes'])
-        cross_entropy_loss = tf.losses.softmax_cross_entropy(one_hot_labels, classifier_scores)
+        cross_entropy_loss = tf.losses.softmax_cross_entropy(
+            one_hot_labels, classifier_scores)
 
-        new_prototypes = bregman.get_prototypes_from_embeddings(embeddings, labels, params['num_classes'])
+        new_prototypes = bregman.get_prototypes_from_embeddings(
+            embeddings, labels, params['num_classes'])
         self.update_prototypes = tf.assign(prototypes, new_prototypes)
 
-
         self.loss = cross_entropy_loss
-        optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
-        self.solver = optimizer.minimize(self.loss, global_step=self.global_step, var_list=model_var)
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=params['learning_rate'])
+        self.solver = optimizer.minimize(
+            self.loss, global_step=self.global_step, var_list=model_var)
         tf.summary.scalar('bregman_loss', self.loss)
 
         # build a graph for evaluation. Reuse our model for evaluating
-        _, eval_endpoints, __ = self.inference(eval_images, params, reuse=tf.AUTO_REUSE)
+        _, eval_endpoints, __ = self.inference(
+            eval_images, params, reuse=tf.AUTO_REUSE)
         eval_embeddings = eval_endpoints['AvgPool_0a_7x7']
-        eval_embeddings = tf.squeeze(eval_embeddings, [1, 2], name='SpatialSqueeze')
-        classifier_scores = bregman.prototypical_classifier(eval_embeddings, labels, prototypes, params['num_classes'])
+        eval_embeddings = tf.squeeze(
+            eval_embeddings, [1, 2], name='SpatialSqueeze')
+        classifier_scores = bregman.prototypical_classifier(
+            eval_embeddings, labels, prototypes, params['num_classes'])
 
         predicted_indices = tf.argmax(input=classifier_scores, axis=1)
         #probabilities = tf.nn.softmax(logits, name='soft_tensor')
@@ -153,9 +168,11 @@ class model():
                                                             predictions=predicted_indices,
                                                             name='acc_op')
         # Isolate the variables stored behind the scenes by the metric operation
-        running_vars = tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES, scope="acc_op")
+        running_vars = tf.get_collection(
+            tf.GraphKeys.LOCAL_VARIABLES, scope="acc_op")
         # Define initializer to initialize/reset running variables
-        self.running_vars_initializer = tf.variables_initializer(var_list=running_vars)
+        self.running_vars_initializer = tf.variables_initializer(
+            var_list=running_vars)
 
         return
 
