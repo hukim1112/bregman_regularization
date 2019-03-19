@@ -3,7 +3,7 @@ import tensorflow as tf
 from backbone import inception
 from datasets import flower_dataset
 from models import bregman_regularizer as bregman
-import math
+import math, os
 slim = tf.contrib.slim
 
 # params = ['learning_rate', 'batch_size', 'model_dir',
@@ -27,8 +27,8 @@ class model():
             self.saver = tf.train.Saver(var_list=variables_to_restore)
             self.initializer = tf.global_variables_initializer()
 
-            path_to_latest_ckpt = tf.train.latest_checkpoint(
-                checkpoint_dir=params['model_dir'])
+            path_to_latest_ckpt = tf.train.latest_checkpoint(checkpoint_dir=os.path.dirname(
+                params['model_dir']))
             self.sess.run(self.initializer)
 
             if params['pretrained_model'] != None:
@@ -87,8 +87,8 @@ class model():
             return iterator, num_images
 
         elif mode == 'categoy_balanced_input':
-            filepaths, class_names_to_ids = flower_dataset.load_categorical_data(dataset_dir)
-            categorical_batch_size = math.floor(batch_size / self.num_classes)
+            filepaths, class_name_to_ids = flower_dataset.load_categorical_data(dataset_dir)
+            categorical_batch_size = math.floor(batch_size / len(class_name_to_ids.keys()))
             category_balanced_data = flower_dataset.category_balancing_input_fn(
                 filepaths, class_name_to_ids, categorical_batch_size)
             return category_balanced_data, categorical_batch_size
@@ -119,7 +119,6 @@ class model():
         # get batch of training dataset
         category_balanced_data, categorical_batch_size = self.load_batch(params['train_datadir'], params['batch_size'], mode='categoy_balanced_input')
         print("Each batch we get {} images for each category".format(categorical_batch_size))
-
         images = tf.concat([x[0] for x in category_balanced_data.values()], axis = 0)
         labels = tf.concat([x[1] for x in category_balanced_data.values()], axis = 0)
 

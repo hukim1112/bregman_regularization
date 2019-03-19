@@ -2,7 +2,7 @@
 import tensorflow as tf
 from backbone import inception
 from datasets import flower_dataset
-import math
+import math, os
 slim = tf.contrib.slim
 
 # params = ['learning_rate', 'batch_size', 'model_dir',
@@ -26,8 +26,8 @@ class model():
             self.saver = tf.train.Saver(var_list=variables_to_restore)
             self.initializer = tf.global_variables_initializer()
 
-            path_to_latest_ckpt = tf.train.latest_checkpoint(
-                checkpoint_dir=params['model_dir'])
+            path_to_latest_ckpt = tf.train.latest_checkpoint(checkpoint_dir=os.path.dirname(
+                params['model_dir']))
             self.sess.run(self.initializer)
 
             if params['pretrained_model'] != None:

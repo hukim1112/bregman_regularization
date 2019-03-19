@@ -98,7 +98,7 @@ def predict_input_fn(filepaths, class_names_to_ids, batch_size):
 def category_balancing_input_fn(filepaths, class_names_to_ids, categorical_batch_size):
     data = {}
     for name in class_names_to_ids.keys():
-        dataset = tf.data.Dataset.from_tensor_slices(tf.cast(
+        dataset_filepath = tf.data.Dataset.from_tensor_slices(tf.cast(
             filepaths[name], tf.string))
         dataset_class = tf.data.Dataset.from_tensor_slices(
         [class_names_to_ids[os.path.basename(os.path.dirname(filepath))] for filepath in filepaths[name]])
@@ -111,6 +111,7 @@ def category_balancing_input_fn(filepaths, class_names_to_ids, categorical_batch
             dataset = dataset.batch(categorical_batch_size)
         else:
             dataset = dataset.batch(math.floor(len(filepaths[name])/2))
-        dataset = dataset.prefetch(2 * batch_size)
+        dataset = dataset.prefetch(2 * categorical_batch_size)
         iterator = dataset.make_one_shot_iterator()
         data[name] = iterator.get_next()
+    return data

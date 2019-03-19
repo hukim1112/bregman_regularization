@@ -12,12 +12,12 @@ def main():
      			   'train_datadir' : '/home/dan/prj/datasets/flowers/flower_example1/train_116',
      			    'eval_datadir' : '/home/dan/prj/datasets/flowers/flower_example1/eval'}
 
-    trainer = vanilla.model(params)
+    trainer = bregman.model(params)
     trainer.train(params)
     del trainer
     params['pretrained_model'] = None
     params['eval_datadir'] = '/home/dan/prj/datasets/flowers/flower_example1/test'
-    tester = vanilla.model(params)
+    tester = bregman.model(params)
     score = tester.eval(params)
 
     print("This model's Final score is {}".format(score))
