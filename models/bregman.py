@@ -78,18 +78,26 @@ class model():
         return score
 
     def load_batch(self, dataset_dir, batch_size, mode='training'):
-
-        if mode == 'predict':
-            filepaths, class_name_to_ids = flower_dataset.load_data(
-                dataset_dir)
+        if mode == 'training':
             num_images = len(filepaths)
-            dataset = flower_dataset.predict_input_fn(
-                filepaths, class_name_to_ids, batch_size)
-        elif mode == 'training':
-            filepaths, class_names_to_ids = load_categorical_data(dataset_dir)
-            stacked_data = flower_dataset.categorical_input_fn(
-                filepaths, class_name_to_ids, categorical_batch_size, num_images, mode)
-            return stacked_data
+            filepaths, class_name_to_ids = flower_dataset.load_data(dataset_dir)
+            dataset = flower_dataset.input_fn(filepaths, class_name_to_ids, batch_size, num_images, mode)
+            iterator = dataset.make_one_shot_iterator()
+            return iterator, num_images
+
+        elif mode == 'categoy_balanced_input':
+            filepaths, class_names_to_ids = flower_dataset.load_categorical_data(dataset_dir)
+            categorical_batch_size = math.floor(batch_size / self.num_classes)
+            category_balanced_data = flower_dataset.category_balancing_input_fn(
+                filepaths, class_name_to_ids, categorical_batch_size)
+            return category_balanced_data, categorical_batch_size
+        # elif mode == 'predict':
+        #     filepaths, class_name_to_ids = flower_dataset.load_data(
+        #         dataset_dir)
+        #     num_images = len(filepaths)
+        #     dataset = flower_dataset.predict_input_fn(
+        #         filepaths, class_name_to_ids, batch_size)
+
         else:  # 'eval'
             filepaths, class_name_to_ids = flower_dataset.load_data(
                 dataset_dir)
@@ -97,7 +105,7 @@ class model():
             dataset = flower_dataset.input_fn(
                 filepaths, class_name_to_ids, batch_size, num_images, mode)
             iterator = dataset.make_initializable_iterator()
-        return iterator, num_images
+            return iterator, num_images
 
     def inference(self, images, params, reuse=None):
         with slim.arg_scope(inception.inception_v1_arg_scope()):
@@ -108,9 +116,11 @@ class model():
     def train_model_fn(self, params):
 
         # get batch of training dataset
-        training_dataset_iterator, _ = self.load_batch(
-            params['train_datadir'], params['batch_size'], mode='training')
-        images, labels = training_dataset_iterator.get_next()
+        category_balanced_data, categorical_batch_size = self.load_batch(params['train_datadir'], params['batch_size'], mode='categoy_balanced_input')
+        print("Each batch we get {} images for each category".format(categorical_batch_size))
+
+        images = tf.concat([x[0] for x in category_balanced_data.values()], axis = 0)
+        labels = tf.concat([x[1] for x in category_balanced_data.values()], axis = 0)
 
         # get a batch of evaluation dataset
         self.eval_dataset_iterator, num_eval_images = self.load_batch(

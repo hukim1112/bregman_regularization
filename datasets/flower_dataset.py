@@ -37,8 +37,8 @@ def load_categorical_data(dataset_dir):
                 path = os.path.join(directory, filename)
                 filepaths[dir_name].append(path)
             class_names.append(dir_name)
-      class_names_to_ids = dict(zip(class_names, range(len(class_names))))
-      return filepaths, class_names_to_ids
+    class_names_to_ids = dict(zip(class_names, range(len(class_names))))
+    return filepaths, class_names_to_ids
 
 
 def load_data(dataset_dir):
@@ -95,7 +95,7 @@ def predict_input_fn(filepaths, class_names_to_ids, batch_size):
     # Return the dataset.
     return dataset
 
-def categorical_input_fn(filepaths, class_names_to_ids, categorical_batch_size, mode="training"):
+def category_balancing_input_fn(filepaths, class_names_to_ids, categorical_batch_size):
     data = {}
     for name in class_names_to_ids.keys():
         dataset = tf.data.Dataset.from_tensor_slices(tf.cast(
@@ -114,5 +114,3 @@ def categorical_input_fn(filepaths, class_names_to_ids, categorical_batch_size, 
         dataset = dataset.prefetch(2 * batch_size)
         iterator = dataset.make_one_shot_iterator()
         data[name] = iterator.get_next()
-        stacked_data = tf.stack([x for x in data.values()])
-        stacked_data = tf.reshape(stacked_data, shape=(-1, 224, 224, 3))
