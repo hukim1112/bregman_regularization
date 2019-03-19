@@ -106,7 +106,7 @@ def get_train_split(dataset_dir, dest_dir, train_dataset_split_num):
           None but images in original directory would be splited into directories of split names     
     """
     # Load dataset from original flower-image names and shuffle them.
-    filepaths, class_names_to_ids = load_data(dataset_dir)
+    filepaths, class_names_to_ids = flower_dataset.load_data(dataset_dir)
     random.shuffle(filepaths)
     for num in train_dataset_split_num:
         # Make directories of splited train dataset
@@ -124,8 +124,8 @@ def get_train_split(dataset_dir, dest_dir, train_dataset_split_num):
 
 
 def main():
-    #dict_of_split_info = {'train': 2500, 'eval': 670, 'test' : 500}
-    dict_of_split_info = {'train': 2500, 'test': 1170}
+    dict_of_split_info = {'train': 2500, 'eval': 670, 'test' : 500}
+    #dict_of_split_info = {'train': 2500, 'test': 1170}
     splits_name = ""
     for i in dict_of_split_info.keys():
         splits_name = splits_name + " " + i

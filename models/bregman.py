@@ -57,9 +57,10 @@ class model():
                     if self.eval_max < score:
                         self.eval_max = score
                         self.eval_max_global_step = global_step
-                    tf.summary.scalar('eval_accuracy', score)
-                    self.saver.save(
+                        self.saver.save(
                         self.sess, params['model_dir'], global_step=self.global_step)
+                    tf.summary.scalar('eval_accuracy', score)
+                    
                 if i == params['iteration']:
                     print(self.eval_max, self.eval_max_global_step)
         except KeyboardInterrupt:
