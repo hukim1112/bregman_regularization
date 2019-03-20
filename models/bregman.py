@@ -3,7 +3,8 @@ import tensorflow as tf
 from backbone import inception
 from datasets import flower_dataset
 from models import bregman_regularizer as bregman
-import math, os
+import math
+import os
 slim = tf.contrib.slim
 
 # params = ['learning_rate', 'batch_size', 'model_dir',
@@ -15,7 +16,7 @@ class model():
     def __init__(self, params):
         self.graph = tf.Graph()
         config = tf.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = 0.4
+        config.gpu_options.per_process_gpu_memory_fraction = 0.9
         self.sess = tf.Session(graph=self.graph, config=config)
         self.eval_max = 0
         self.eval_max_global_step = 0
@@ -58,9 +59,9 @@ class model():
                         self.eval_max = score
                         self.eval_max_global_step = global_step
                         self.saver.save(
-                        self.sess, params['model_dir'], global_step=self.global_step)
+                            self.sess, params['model_dir'], global_step=self.global_step)
                     tf.summary.scalar('eval_accuracy', score)
-                    
+
                 if i == params['iteration']:
                     print(self.eval_max, self.eval_max_global_step)
         except KeyboardInterrupt:
@@ -81,14 +82,18 @@ class model():
     def load_batch(self, dataset_dir, batch_size, mode='training'):
         if mode == 'training':
             num_images = len(filepaths)
-            filepaths, class_name_to_ids = flower_dataset.load_data(dataset_dir)
-            dataset = flower_dataset.input_fn(filepaths, class_name_to_ids, batch_size, num_images, mode)
+            filepaths, class_name_to_ids = flower_dataset.load_data(
+                dataset_dir)
+            dataset = flower_dataset.input_fn(
+                filepaths, class_name_to_ids, batch_size, num_images, mode)
             iterator = dataset.make_one_shot_iterator()
             return iterator, num_images
 
         elif mode == 'categoy_balanced_input':
-            filepaths, class_name_to_ids = flower_dataset.load_categorical_data(dataset_dir)
-            categorical_batch_size = math.floor(batch_size / len(class_name_to_ids.keys()))
+            filepaths, class_name_to_ids = flower_dataset.load_categorical_data(
+                dataset_dir)
+            categorical_batch_size = math.floor(
+                batch_size / len(class_name_to_ids.keys()))
             category_balanced_data = flower_dataset.category_balancing_input_fn(
                 filepaths, class_name_to_ids, categorical_batch_size)
             return category_balanced_data, categorical_batch_size
@@ -117,10 +122,14 @@ class model():
     def train_model_fn(self, params):
 
         # get batch of training dataset
-        category_balanced_data, categorical_batch_size = self.load_batch(params['train_datadir'], params['batch_size'], mode='categoy_balanced_input')
-        print("Each batch we get {} images for each category".format(categorical_batch_size))
-        images = tf.concat([x[0] for x in category_balanced_data.values()], axis = 0)
-        labels = tf.concat([x[1] for x in category_balanced_data.values()], axis = 0)
+        category_balanced_data, categorical_batch_size = self.load_batch(
+            params['train_datadir'], params['batch_size'], mode='categoy_balanced_input')
+        print("Each batch we get {} images for each category".format(
+            categorical_batch_size))
+        images = tf.concat([x[0]
+                            for x in category_balanced_data.values()], axis=0)
+        labels = tf.concat([x[1]
+                            for x in category_balanced_data.values()], axis=0)
 
         # get a batch of evaluation dataset
         self.eval_dataset_iterator, num_eval_images = self.load_batch(
