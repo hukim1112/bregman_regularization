@@ -8,7 +8,7 @@ n_train_classes = 64
 n_test_classes = 20
 n_examples, width, height, channels = 350, 84, 84, 3
 
-root_path = './data/mini-imagenet/data'
+root_path = './datasets/mini-imagenet'
 train_path = os.path.join(root_path, 'train')
 test_path = os.path.join(root_path, 'test')
 
@@ -31,9 +31,9 @@ def sample_dataset(dataset, dirs, name='train'):
 
 train_dataset = np.zeros((n_train_classes, n_examples, width, height, channels), dtype=np.uint8)
 train_dataset = sample_dataset(train_dataset, train_dirs)
-np.save('mini-imagenet-train.npy', train_dataset)
+np.save(os.path.join(root_path, 'npy', 'mini-imagenet-train.npy'), train_dataset)
 del train_dataset
 
 test_dataset = np.zeros((n_test_classes, n_examples, width, height, channels), dtype=np.uint8)
 test_dataset = sample_dataset(test_dataset, test_dirs, name='test')
-np.save('mini-imagenet-test.npy', test_dataset)
+np.save(os.path.join(root_path, 'npy', 'mini-imagenet-train.npy'), test_dataset)
